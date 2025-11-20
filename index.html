@@ -68,25 +68,35 @@
             background: #357a7b;
         }
         table {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             width: 100%;
             background: #fff;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 2px 8px #0001;
+            box-shadow: 0 2px 12px #0002;
+            margin-bottom: 1.5em;
         }
         th, td {
-            border: 1px solid #e3e8ee;
-            padding: 10px 12px;
+            border: none;
+            padding: 14px 18px;
             text-align: left;
+            font-size: 1.08em;
         }
         th {
-            background: #f4f8fb;
+            background: linear-gradient(90deg, #eaf3fa 0%, #f4f8fb 100%);
             color: #2a3a4b;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.03em;
         }
-        tr:nth-child(even) {
+        tbody tr {
+            transition: background 0.2s;
+        }
+        tbody tr:nth-child(even) {
             background: #f7f9fb;
+        }
+        tbody tr:hover {
+            background: #e3e8ee;
         }
         #download-modal {
             display:none;
@@ -125,13 +135,18 @@
     </style>
 </head>
 <body>
+    <!-- Top-right pagination container -->
+    <div style="display:flex; justify-content:flex-end; margin-bottom:1em;">
+        <div id="pagination-top"></div>
+    </div>
     <div class="container">
-        <h1>Amazon DSP Directory</h1>
+    <h1>Company Directory</h1>
         <div class="controls">
             <input type="text" id="search-input" placeholder="Search...">
             <div class="filters">
                 <span style="margin-right:1em;">Filter by:</span>
-                <label><input type="checkbox" class="filter-check" value="DSP Name" checked> DSP Name</label>
+                <label><input type="checkbox" class="filter-check" value="Name" checked> Company Name</label>
+                <label><input type="checkbox" class="filter-check" value="Type" checked> Type</label>
                 <label><input type="checkbox" class="filter-check" value="City" checked> City</label>
                 <label><input type="checkbox" class="filter-check" value="State/Province" checked> State</label>
                 <label><input type="checkbox" class="filter-check" value="Zip/Postal Code" checked> Zip</label>
@@ -141,8 +156,13 @@
             </div>
             <button id="download-btn">Download CSV/Excel</button>
         </div>
-        <div id="summary"></div>
-        <div id="table-container">Loading data...</div>
+    <div id="summary"></div>
+    
+    <div id="table-container">Loading data...</div>
+        <!-- Bottom pagination container -->
+        <div style="margin-top:1em; display:flex; justify-content:center;">
+            <div id="pagination-bottom"></div>
+        </div>
         <div id="download-modal">
             <div class="modal-box">
                 <div id="modal-content" style="margin-bottom:1em;"></div>
@@ -228,42 +248,93 @@
     document.getElementById('modal-cancel').addEventListener('click', hideDownloadModal);
     let dspRows = [];
     let dspHeaders = [];
+    let currentPage = 1;
+    const pageSize = 100;
+
     function renderTable(filteredRows) {
-        const headers = dspHeaders;
+
+
+
+        // Tableau style: all columns
         const table = document.createElement('table');
         const thead = document.createElement('thead');
         const trHead = document.createElement('tr');
-        headers.forEach(h => {
+        dspHeaders.forEach(header => {
             const th = document.createElement('th');
-            th.textContent = h;
+            th.textContent = header;
             trHead.appendChild(th);
         });
         thead.appendChild(trHead);
         table.appendChild(thead);
         const tbody = document.createElement('tbody');
-        filteredRows.forEach(row => {
+        // Pagination logic
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, filteredRows.length);
+        const pageRows = filteredRows.slice(startIdx, endIdx);
+        pageRows.forEach(row => {
             const tr = document.createElement('tr');
-            headers.forEach(h => {
+            dspHeaders.forEach(header => {
                 const td = document.createElement('td');
-                td.textContent = row[h] || '';
+                td.textContent = row[header] || '';
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
         });
         table.appendChild(tbody);
         const container = document.getElementById('table-container');
-        container.innerHTML = '';
-        container.appendChild(table);
+        if (container) {
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+
+        // Show company names above the table
+        const companyNamesDiv = document.getElementById('company-names');
+        if (companyNamesDiv) {
+            const names = filteredRows.map(r => r['Name']).filter(Boolean);
+            companyNamesDiv.innerHTML = names.length ? `<strong>Companies:</strong> ${names.join(', ')}` : '';
+        }
 
         // Summary stats
-        const dspCount = filteredRows.length;
-        const countrySet = new Set(filteredRows.map(r => r['Country']).filter(Boolean));
-        const stateSet = new Set(filteredRows.map(r => r['State/Province']).filter(Boolean));
-        document.getElementById('summary').textContent = `DSPs: ${dspCount} | Countries: ${countrySet.size} | States: ${stateSet.size}`;
+        const summaryDiv = document.getElementById('summary');
+        if (summaryDiv) {
+            const companyCount = filteredRows.length;
+            const countrySet = new Set(filteredRows.map(r => r['Country']).filter(Boolean));
+            const stateSet = new Set(filteredRows.map(r => r['State/Province']).filter(Boolean));
+            summaryDiv.textContent = `Companies: ${companyCount} | Countries: ${countrySet.size} | States: ${stateSet.size}`;
+        }
+
+        // Pagination controls (top right and bottom)
+        const totalPages = Math.ceil(filteredRows.length / pageSize);
+        let html = '';
+        if (totalPages > 1) {
+            html += `<button ${currentPage === 1 ? 'disabled' : ''} id="prev-page">&lt; Prev</button>`;
+            html += ` Page ${currentPage} of ${totalPages} `;
+            html += `<button ${currentPage === totalPages ? 'disabled' : ''} id="next-page">Next &gt;</button>`;
+        }
+        // Top right
+        const paginationTop = document.getElementById('pagination-top');
+        if (paginationTop) paginationTop.innerHTML = html;
+        // Bottom
+        const paginationBottom = document.getElementById('pagination-bottom');
+        if (paginationBottom) paginationBottom.innerHTML = html;
+        if (totalPages > 1) {
+            // Add event listeners for both paginations
+            document.querySelectorAll('#prev-page').forEach(btn => {
+                btn.onclick = function() {
+                    if (currentPage > 1) { currentPage--; renderTable(filteredRows); }
+                };
+            });
+            document.querySelectorAll('#next-page').forEach(btn => {
+                btn.onclick = function() {
+                    if (currentPage < totalPages) { currentPage++; renderTable(filteredRows); }
+                };
+            });
+        }
     }
 
     async function loadDSPData() {
-        const url = 'http://127.0.0.1:5000/api/dsp-data';
+    // Fetch merged DSPs and FedEx ISPs from backend
+    const url = 'http://127.0.0.1:5001/api/all-companies';
         try {
             const response = await fetch(url);
             if (!response.ok) {
@@ -291,6 +362,7 @@
         const filtered = dspRows.filter(row => {
             return filters.some(f => (row[f] || '').toLowerCase().includes(value));
         });
+        currentPage = 1;
         renderTable(filtered);
     }
 
